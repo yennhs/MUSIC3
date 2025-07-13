@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <title>{{title}}</title>
+  <style>
+    .panel {
+      text-align: center;
+    }
+  .track-icon-vocals {
+      width: 64px;
+      height: 64px;
+      margin: 10px;
+      position: fixed;
+      top: 50%;
+      left: 22%;
+      rotate: -20deg;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s;
+    }
+    .track-icon-vocals.muted {
+      opacity: 0.3;
+    }
+    .track-icon-vocals:hover {
+      opacity: 0.9;
+      transform: scale(1.1);
+    }
+
+  .track-icon-drums {
+      width: 64px;
+      height: 64px;
+      margin: 10px;
+      position: fixed;
+      top: 43%;
+      left: 34%;
+      rotate: 0deg;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s;
+    }
+      .track-icon-drums.muted {
+      opacity: 0.3;
+    }
+      .track-icon-drums:hover {
+      opacity: 0.9;
+      transform: scale(1.1);
+    }
+.track-icon-other {
+      width: 60px;
+      height: 60px;
+      margin: 10px;
+      position: fixed;
+      top: 43%;
+      right: 36%;
+      rotate: 0deg;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s;
+    }
+    .track-icon-other.muted {
+      opacity: 0.3;
+    }
+    .track-icon-other:hover {
+      opacity: 0.9;
+      transform: scale(1.1);
+    }
+
+  .track-icon-bass {
+      width: 64px;
+      height: 64px;
+      margin: 10px;
+      position: fixed;
+      top: 50%;
+      right: 24%;
+      rotate: 0deg;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s;
+    }
+    .track-icon-bass.muted {
+      opacity: 0.3;
+    }
+    .track-icon-bass:hover {
+      opacity: 0.9;
+      transform: scale(1.1);
+    }
+
+
+
+    #play-button {
+      position: fixed;
+      width: 64px;
+      height: 64px;
+      left: 47%;
+      top: 70%;
+      transform: translate(-50%, -50%);
+      font-size: 64px;
+      cursor: pointer;
+      margin: 20px;
+      z-index: 999;
+    }
+
+  .history-toggle-icon {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    font-size: 30px;
+    cursor: pointer;
+    z-index: 1000;
+  }
+
+  .drawer {
+    position: fixed;
+    top: 0;
+    right: -300px;
+    width: 300px;
+    height: 100%;
+    background-color: #fefefe;
+    border-left: 1px solid #ccc;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+    transition: right 0.3s ease;
+    z-index: 999;
+    padding: 1px;
+  }
+
+
+    .drawer.open {
+    right: 0;
+  }
+
+  .drawer-header {
+    font-weight: bold;
+    padding: 10px;
+    background-color: #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    }
+
+  .close-arrow {
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .drawer-body {
+    padding: 10px;
+  }
+
+  .history-entry {
+    margin-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+  }
+.reset-button {
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  padding: 8px 16px;
+  font-size: 16px;
+  background-color: #ffdddd;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.reset-button:hover {
+  background-color: #c7abab;
+}
+#progress-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 10%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 6px;
+  border: none;
+  outline: none;
+  background: #ccc;
+  border-radius: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  z-index: 999;
+}
+#progress-bar::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #ccc;
+  border-radius: 4px;
+}
+
+/* 拖曳圓點（滑塊）樣式 */
+#progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #e3cb4e;
+  cursor: pointer;
+  margin-top: -5px;
+  transition: background 0.2s;
+}
+#progress-bar::-webkit-slider-thumb:hover {
+  background: #222;
+}
+
+
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="track-grid">
+  <img src="/static/icons/vocals.png" class="track-icon-vocals" id="vocals-icon" onclick="toggleMute('vocals')">
+  <img src="/static/icons/drums.png" class="track-icon-drums" id="drums-icon" onclick="toggleMute('drums')">
+  <img src="/static/icons/bass.png" class="track-icon-bass" id="bass-icon" onclick="toggleMute('bass')">
+  <img src="/static/icons/other.png" class="track-icon-other" id="other-icon" onclick="toggleMute('other')">
+</div>
+
+  </div>
+
+  <button class="reset-button" onclick="location.href='/reset'">分析新歌曲</button>
+  <img src="/static/icons/history.png" class="history-toggle-icon" onclick="toggleHistory()" />
+
+
+<div id="historyDrawer" class="drawer">
+  <div class="drawer-header">
+    歷史曲目
+    <span class="close-arrow" onclick="toggleHistory()"> </span>
+  </div>
+  <div id="historyContent">
+    {% if history %}
+      {% for item in history %}
+        <div class="history-entry">
+          <strong>{{ item.title }}</strong><br>
+          <a href="/static/{{ item.folder }}/vocals.mp3" target="_blank">🎤</a>
+          <a href="/static/{{ item.folder }}/drums.mp3" target="_blank">🥁</a>
+          <a href="/static/{{ item.folder }}/bass.mp3" target="_blank">🎸</a>
+          <a href="/static/{{ item.folder }}/other.mp3" target="_blank">🎹</a>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>尚無歷史紀錄</p>
+    {% endif %}
+  </div>
+</div>
+
+
+<div class="player-container">
+  <img id="play-button" src="/static/icons/play.png" onclick="togglePlayPause()" />
+  <input type="range" id="progress-bar" value="0" step="1" min="0" max="100">
+</div>
+
+  <!-- 音訊元素 -->
+  <audio id="vocals" src="/static/{{folder}}/vocals.mp3" loop></audio>
+  <audio id="drums" src="/static/{{folder}}/drums.mp3" loop></audio>
+  <audio id="bass" src="/static/{{folder}}/bass.mp3" loop></audio>
+  <audio id="other" src="/static/{{folder}}/other.mp3" loop></audio>
+
+<script>
+  const tracks = ['vocals', 'drums', 'bass', 'other'];
+  let isPlaying = false;
+  let progressTimer = null;
+
+
+  function toggleMute(name) {
+    const audio = document.getElementById(name);
+    const icon = document.getElementById(name + "-icon");
+    audio.muted = !audio.muted;
+    icon.classList.toggle("muted", audio.muted);
+  }
+
+  function togglePlayPause() {
+    isPlaying = !isPlaying;
+    const playBtn = document.getElementById("play-button");
+    playBtn.src = isPlaying ? "/static/icons/pause.png" : "/static/icons/play.png";
+
+    tracks.forEach(name => {
+      const audio = document.getElementById(name);
+      if (isPlaying) {
+        audio.play().catch(err => {
+         console.error(`播放 ${name} 時出錯：`, err);
+       });
+      } else {
+        audio.pause();
+      }
+  });
+  if (isPlaying) {
+  startProgressUpdater();
+  } else {
+  clearInterval(progressTimer);
+}
+
+ }
+function startProgressUpdater() {
+  const progressBar = document.getElementById("progress-bar");
+  const mainAudio = document.getElementById("vocals");
+
+  progressTimer = setInterval(() => {
+    if (mainAudio.duration) {
+      progressBar.value = (mainAudio.currentTime / mainAudio.duration) * 100;
+    }
+  }, 500);
+}
+
+document.getElementById("progress-bar").addEventListener("input", function () {
+  const mainAudio = document.getElementById("vocals");
+  if (mainAudio.duration) {
+    const percent = this.value / 100;
+    mainAudio.currentTime = percent * mainAudio.duration;
+    tracks.forEach(name => {
+      const audio = document.getElementById(name);
+      audio.currentTime = mainAudio.currentTime;
+    });
+  }
+});
+  function toggleHistory() {
+    const drawer = document.getElementById("historyDrawer");
+    drawer.classList.toggle("open");
+    }
+</script>
+</body>
+</html>

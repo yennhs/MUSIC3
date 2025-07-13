@@ -1,0 +1,15 @@
+*.mp3
+*.wav
+__pycache__/
+downloads/
+separated/
+static/*/*.mp3
+static/*/*.wav
+
+external libraries
+venv
+.venv/
+.DS_Store
+# PyCharm
+.idea/
+*.iml
