@@ -8,7 +8,6 @@ import os
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "2025")
 
-# 確保 static 資料夾存在
 static_dir = Path("static")
 static_dir.mkdir(exist_ok=True)
 
@@ -18,15 +17,27 @@ if cookies_content:
     with open("cookies.txt", "w") as f:
         f.write(cookies_content.replace("\\n", "\n"))
 
+@app.route("/", methods=["GET", "POST", "HEAD"])
+def index():
+    if request.method == "POST":
+        url = request.form.get("youtube_url")
+        if url:
+            return redirect(url_for("separate", youtube_url=url))
+    return """
+        <h2>Demucs 音源分離器</h2>
+        <form method="POST">
+            <input name="youtube_url" placeholder="YouTube URL">
+            <button type="submit">下載並分離</button>
+        </form>
+    """
+
 @app.route("/separate")
 def separate():
     youtube_url = request.args.get("youtube_url")
     if not youtube_url:
         return "請輸入 YouTube 連結", 400
-
     downloads = Path("downloads")
     downloads.mkdir(exist_ok=True)
-
     ydl_opts = {
         "format": "bestaudio/best",
         "restrictfilenames": True,
@@ -43,9 +54,9 @@ def separate():
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9",
         },
-        "cookiefile": "cookies.txt",  # 使用 cookies
-        "sleep_interval": 5,  # 每次請求間隔 5 秒
-        "max_sleep": 10,  # 最大延遲 10 秒
+        "cookiefile": "cookies.txt",
+        "sleep_interval": 5,
+        "max_sleep": 10,
     }
 
     try:
