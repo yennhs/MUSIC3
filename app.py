@@ -36,22 +36,22 @@ def separate():
     downloads.mkdir(exist_ok=True)
 
     ydl_opts = {
-        "format": "bestaudio/best",
-        "restrictfilenames": True,
-        "outtmpl": str(downloads / "%(title)s.%(ext)s"),
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "wav",
-            "preferredquality": "192",
-        }],
-        "quiet": True,
-        "noplaylist": True
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
+    "format": "bestaudio/best",
+    "restrictfilenames": True,
+    "outtmpl": str(downloads / "%(title)s.%(ext)s"),
+    "postprocessors": [{
+        "key": "FFmpegExtractAudio",
+        "preferredcodec": "wav",
+        "preferredquality": "192",
+    }],
+    "quiet": True,
+    "noplaylist": True,  # ← ✅ 加上這個逗號
+    "http_headers": {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
     }
+}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
