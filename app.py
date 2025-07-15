@@ -6,7 +6,7 @@ from pydub import AudioSegment
 import os
 
 app = Flask(__name__)
-app.secret_key = "2025"  # session 使用
+app.secret_key = os.environ.get("SECRET_KEY", "2025")  # 使用環境變數
 
 # 確保 static 資料夾存在
 static_dir = Path("static")
@@ -30,12 +30,11 @@ def index():
 def separate():
     youtube_url = request.args.get("youtube_url")
     if not youtube_url:
-        return "請輸入 YouTube 連結"
+        return "請輸入 YouTube 連結", 400
 
     downloads = Path("downloads")
     downloads.mkdir(exist_ok=True)
 
-    # --- 下載音檔 ---
     ydl_opts = {
         "format": "bestaudio/best",
         "restrictfilenames": True,
@@ -47,21 +46,32 @@ def separate():
         }],
         "quiet": True,
         "noplaylist": True
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(youtube_url, download=True)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(youtube_url, download=True)
+    except Exception as e:
+        return f"下載失敗: {str(e)}", 500
 
     wav_path = Path(info["requested_downloads"][0]["filepath"]).with_suffix(".wav")
     title = wav_path.stem
 
-    # --- 分離 ---
+    # 分離音頻
     sep_dir = Path("separated/htdemucs") / title
     if not sep_dir.exists():
-        cmd = ["python3", "-m", "demucs","-n", "demucs_quantized", str(wav_path)]
-        subprocess.run(cmd, check=True)
+        try:
+            cmd = ["python3", "-m", "demucs", "-n", "demucs_quantized", str(wav_path)]
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            return f"音源分離失敗: {str(e)}", 500
 
-    # --- 轉 mp3 存到 static/title/ ---
+    # 轉 MP3
     mp3_output_dir = static_dir / title
     mp3_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -69,8 +79,14 @@ def separate():
         wav_file = sep_dir / f"{part}.wav"
         mp3_file = mp3_output_dir / f"{part}.mp3"
         if wav_file.exists():
-            audio = AudioSegment.from_wav(wav_file)
-            audio.export(mp3_file, format="mp3")
+            try:
+                audio = AudioSegment.from_wav(wav_file)
+                audio.export(mp3_file, format="mp3")
+            except Exception as e:
+                return f"MP3 轉換失敗 ({part}): {str(e)}", 500
+
+    # 清理臨時檔案
+    wav_path.unlink(missing_ok=True)
 
     return redirect(url_for("mixer", title=title))
 
@@ -83,4 +99,5 @@ def reset():
     return redirect(url_for("index"))
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
