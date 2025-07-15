@@ -3,16 +3,15 @@ services:
     name: music3
     env: python
     runtime: python-3.11.9
-    plan: free
-    buildCommand: |
-      pip install --upgrade pip && \
-      pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     preDeployCommand: apt-get update && apt-get install -y ffmpeg
     envVars:
-      - key: FLASK_ENV
-        value: production
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: SECRET_KEY
         generateValue: true
+      - key: YOUTUBE_COOKIES
+        value: "<cookies.txt 內容，單行格式>"
+      - key: PROXY_URL
+        value: "http://your_proxy_ip:port"  #
