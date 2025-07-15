@@ -1,34 +1,28 @@
 from flask import Flask, render_template, request, redirect, url_for
 from pathlib import Path
-import yt_dlp
 import subprocess
+import yt_dlp
 from pydub import AudioSegment
+import os
 
 app = Flask(__name__)
-app.secret_key = "2025"
+app.secret_key = os.environ.get("SECRET_KEY", "2025")
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        url = request.form.get("youtube_url")
-        cookies_file = request.files.get("cookies")
+# 確保 static 資料夾存在
+static_dir = Path("static")
+static_dir.mkdir(exist_ok=True)
 
-        if not url or not cookies_file:
-            return "請提供 YouTube 連結與 cookies.txt"
-
-        # 儲存 cookies
-        cookies_path = Path("cookies.txt")
-        cookies_file.save(cookies_path)
-
-        return redirect(url_for("separate", youtube_url=url))
-
-    return render_template("index.html")
+# 從環境變數生成 cookies.txt
+cookies_content = os.environ.get("YOUTUBE_COOKIES")
+if cookies_content:
+    with open("cookies.txt", "w") as f:
+        f.write(cookies_content.replace("\\n", "\n"))
 
 @app.route("/separate")
 def separate():
     youtube_url = request.args.get("youtube_url")
     if not youtube_url:
-        return "請提供 YouTube 連結"
+        return "請輸入 YouTube 連結", 400
 
     downloads = Path("downloads")
     downloads.mkdir(exist_ok=True)
@@ -44,34 +38,51 @@ def separate():
         }],
         "quiet": True,
         "noplaylist": True,
-        "cookiefile": "cookies.txt",
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+        "cookiefile": "cookies.txt",  # 使用 cookies
+        "sleep_interval": 5,  # 每次請求間隔 5 秒
+        "max_sleep": 10,  # 最大延遲 10 秒
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(youtube_url, download=True)
     except Exception as e:
-        return f"❌ 無法下載影片：{e}"
+        return f"下載失敗: {str(e)}", 500
 
     wav_path = Path(info["requested_downloads"][0]["filepath"]).with_suffix(".wav")
     title = wav_path.stem
 
+    # 分離音頻
     sep_dir = Path("separated/htdemucs") / title
     if not sep_dir.exists():
-        cmd = ["python3", "-m", "demucs", "-n", "demucs_quantized", str(wav_path)]
-        subprocess.run(cmd, check=True)
+        try:
+            cmd = ["python3", "-m", "demucs", "-n", "demucs_quantized", str(wav_path)]
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            return f"音源分離失敗: {str(e)}", 500
 
-    output_dir = Path("static") / title
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # 轉 MP3
+    mp3_output_dir = static_dir / title
+    mp3_output_dir.mkdir(parents=True, exist_ok=True)
 
     for part in ["vocals", "drums", "bass", "other"]:
         wav_file = sep_dir / f"{part}.wav"
-        mp3_file = output_dir / f"{part}.mp3"
+        mp3_file = mp3_output_dir / f"{part}.mp3"
         if wav_file.exists():
-            audio = AudioSegment.from_wav(wav_file)
-            audio.export(mp3_file, format="mp3")
+            try:
+                audio = AudioSegment.from_wav(wav_file)
+                audio.export(mp3_file, format="mp3")
+            except Exception as e:
+                return f"MP3 轉換失敗 ({part}): {str(e)}", 500
 
-    return f"✅ 成功分離！請在 static/{title} 中查看音訊。"
+    # 清理臨時檔案
+    wav_path.unlink(missing_ok=True)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    return redirect(url_for("mixer", title=title))
+
+# 其他路由（index, mixer, reset）保持不變
