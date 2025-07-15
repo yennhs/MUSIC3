@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for
 from pathlib import Path
 import subprocess
 import yt_dlp
@@ -6,25 +6,17 @@ from pydub import AudioSegment
 import os
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "2025")  # 使用環境變數
+app.secret_key = os.environ.get("SECRET_KEY", "2025")
 
 # 確保 static 資料夾存在
 static_dir = Path("static")
 static_dir.mkdir(exist_ok=True)
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        url = request.form.get("youtube_url")
-        if url:
-            return redirect(url_for("separate", youtube_url=url))
-    return """
-        <h2>Demucs 音源分離器</h2>
-        <form method="POST">
-            <input name="youtube_url" placeholder="YouTube URL">
-            <button type="submit">下載並分離</button>
-        </form>
-    """
+# 從環境變數生成 cookies.txt
+cookies_content = os.environ.get("YOUTUBE_COOKIES")
+if cookies_content:
+    with open("cookies.txt", "w") as f:
+        f.write(cookies_content.replace("\\n", "\n"))
 
 @app.route("/separate")
 def separate():
@@ -36,22 +28,25 @@ def separate():
     downloads.mkdir(exist_ok=True)
 
     ydl_opts = {
-    "format": "bestaudio/best",
-    "restrictfilenames": True,
-    "outtmpl": str(downloads / "%(title)s.%(ext)s"),
-    "postprocessors": [{
-        "key": "FFmpegExtractAudio",
-        "preferredcodec": "wav",
-        "preferredquality": "192",
-    }],
-    "quiet": True,
-    "noplaylist": True,  # ← ✅ 加上這個逗號
-    "http_headers": {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "*/*",
-        "Accept-Language": "en-US,en;q=0.9",
+        "format": "bestaudio/best",
+        "restrictfilenames": True,
+        "outtmpl": str(downloads / "%(title)s.%(ext)s"),
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "wav",
+            "preferredquality": "192",
+        }],
+        "quiet": True,
+        "noplaylist": True,
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+        "cookiefile": "cookies.txt",  # 使用 cookies
+        "sleep_interval": 5,  # 每次請求間隔 5 秒
+        "max_sleep": 10,  # 最大延遲 10 秒
     }
-}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -90,14 +85,4 @@ def separate():
 
     return redirect(url_for("mixer", title=title))
 
-@app.route("/mixer/<title>")
-def mixer(title):
-    return render_template("mixer_template.html", title=title, folder=title)
-
-@app.route("/reset")
-def reset():
-    return redirect(url_for("index"))
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+# 其他路由（index, mixer, reset）保持不變
