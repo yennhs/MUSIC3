@@ -2,6 +2,7 @@ services:
   - type: web
     name: demucs-audio-separator
     env: python
+    runtime: python-3.11.9
     plan: free
     buildCommand: |
       apt-get update && \
@@ -12,3 +13,5 @@ services:
     envVars:
       - key: FLASK_ENV
         value: production
+      - key: PYTHON_VERSION
+        value: 3.11.9
