@@ -1,17 +1,18 @@
 services:
   - type: web
-    name: demucs-audio-separator
+    name: music3
     env: python
     runtime: python-3.11.9
     plan: free
     buildCommand: |
-      apt-get update && \
-      apt-get install -y ffmpeg && \
       pip install --upgrade pip && \
       pip install -r requirements.txt
     startCommand: gunicorn app:app
+    preDeployCommand: apt-get update && apt-get install -y ffmpeg
     envVars:
       - key: FLASK_ENV
         value: production
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: SECRET_KEY
+        generateValue: true
