@@ -19,16 +19,27 @@ jobs = {}
 downloads.mkdir(exist_ok=True)
 static_dir.mkdir(exist_ok=True)
 
+def sanitize_filename(name: str) -> str:
+    return name.replace("/", "_").replace("\\", "_").replace(" ", "_")
 
 def separate_background(task_id, youtube_url):
     try:
         jobs[task_id] = "下載中..."
         print(f"[任務 {task_id}] 狀態：下載中...")
 
+        # 先獲取影片資訊（不下載）
+        with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
+            info = ydl.extract_info(youtube_url, download=False)
+
+        video_id = info.get("id")
+        title_raw = info.get("title", "unknown")
+        safe_title = sanitize_filename(f"{video_id}_{title_raw}")
+        output_path = downloads / f"{safe_title}.%(ext)s"
+
         ydl_opts = {
             "format": "bestaudio/best",
-            "restrictfilenames": True,
-            "outtmpl": str(downloads / "%(title)s.%(ext)s"),
+            "restrictfilenames": False,
+            "outtmpl": str(output_path),
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "wav",
@@ -47,10 +58,10 @@ def separate_background(task_id, youtube_url):
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=True)
+            ydl.download([youtube_url])
 
-        wav_path = Path(info["requested_downloads"][0]["filepath"]).with_suffix(".wav")
-        title = wav_path.stem
+        wav_path = downloads / f"{safe_title}.wav"
+        title = safe_title
         jobs[task_id] = f"音源分離中：{title}"
         print(f"[任務 {task_id}] 狀態：音源分離中：{title}")
 
@@ -79,7 +90,6 @@ def separate_background(task_id, youtube_url):
         print("[錯誤]", traceback.format_exc())
         jobs[task_id] = f"錯誤: {str(e)}"
 
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -99,12 +109,10 @@ def index():
 
     return render_template("index.html")
 
-
 @app.route("/status")
 def status():
     task_id = request.args.get("task_id")
     return render_template("status.html", task_id=task_id)
-
 
 @app.route("/status_api")
 def status_api():
@@ -119,7 +127,6 @@ def status_api():
     else:
         return jsonify({"status": "processing", "message": status})
 
-
 @app.route("/mixer/<title>")
 def mixer(title):
     history = []
@@ -131,11 +138,13 @@ def mixer(title):
         })
     return render_template("mixer_template.html", title=title, folder=title, history=history)
 
-
 @app.route("/favicon.ico")
 def favicon():
     return "", 204
 
+@app.route("/reset")
+def reset():
+    return redirect(url_for("index"))
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5173)
