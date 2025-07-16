@@ -8,28 +8,42 @@ import os
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "2025")
 
+# 建立基本資料夾
+downloads = Path("downloads")
 static_dir = Path("static")
+downloads.mkdir(exist_ok=True)
 static_dir.mkdir(exist_ok=True)
 
-# 從環境變數生成 cookies.txt
-cookies_content = os.environ.get("YOUTUBE_COOKIES")
-if cookies_content:
-    with open("cookies.txt", "w") as f:
-        f.write(cookies_content.replace("\\n", "\n"))
-
-@app.route("/", methods=["GET", "POST", "HEAD"])
+@app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
         url = request.form.get("youtube_url")
-        if url:
-            return redirect(url_for("separate", youtube_url=url))
-            return render_template("index.html")
+        cookies_file = request.files.get("cookies")
+
+        if not url or not cookies_file:
+            return "❗請提供 YouTube 連結與 cookies.txt", 400
+
+        # 儲存上傳的 cookies.txt
+        cookies_path = Path("cookies.txt")
+        cookies_file.save(cookies_path)
+
+        return redirect(url_for("separate", youtube_url=url))
+
     return """
+    <!DOCTYPE html>
+    <html lang="zh-TW">
+    <head><meta charset="UTF-8"><title>Demucs 音源分離器</title></head>
+    <body>
         <h2>Demucs 音源分離器</h2>
-        <form method="POST">
-            <input name="youtube_url" placeholder="YouTube URL">
+        <form method="POST" enctype="multipart/form-data">
+            <label>輸入 YouTube 連結：</label><br>
+            <input type="text" name="youtube_url" required><br><br>
+            <label>上傳 cookies.txt：</label><br>
+            <input type="file" name="cookies" accept=".txt" required><br><br>
             <button type="submit">下載並分離</button>
         </form>
+    </body>
+    </html>
     """
 
 @app.route("/separate")
@@ -37,8 +51,7 @@ def separate():
     youtube_url = request.args.get("youtube_url")
     if not youtube_url:
         return "請輸入 YouTube 連結", 400
-    downloads = Path("downloads")
-    downloads.mkdir(exist_ok=True)
+
     ydl_opts = {
         "format": "bestaudio/best",
         "restrictfilenames": True,
@@ -50,35 +63,35 @@ def separate():
         }],
         "quiet": True,
         "noplaylist": True,
+        "cookiefile": "cookies.txt",
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0",
+            "User-Agent": "Mozilla/5.0",
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9",
         },
-        "cookiefile": "cookies.txt",
-        "sleep_interval": 5,
-        "max_sleep": 10,
+        "sleep_interval": 3,
+        "max_sleep": 8,
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(youtube_url, download=True)
     except Exception as e:
-        return f"下載失敗: {str(e)}", 500
+        return f"❌ 音訊下載失敗：{e}", 500
 
     wav_path = Path(info["requested_downloads"][0]["filepath"]).with_suffix(".wav")
     title = wav_path.stem
 
-    # 分離音頻
     sep_dir = Path("separated/htdemucs") / title
-    if not sep_dir.exists():
-        try:
-            cmd = ["python3", "-m", "demucs", "-n", "demucs_quantized", str(wav_path)]
-            subprocess.run(cmd, check=True)
-        except subprocess.CalledProcessError as e:
-            return f"音源分離失敗: {str(e)}", 500
+    try:
+        if not sep_dir.exists():
+            subprocess.run([
+                "python3", "-m", "demucs", "-n", "demucs_quantized", str(wav_path)
+            ], check=True)
+    except subprocess.CalledProcessError as e:
+        return f"❌ 音源分離失敗：{e}", 500
 
-    # 轉 MP3
+    # 將音軌轉 mp3
     mp3_output_dir = static_dir / title
     mp3_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -90,11 +103,38 @@ def separate():
                 audio = AudioSegment.from_wav(wav_file)
                 audio.export(mp3_file, format="mp3")
             except Exception as e:
-                return f"MP3 轉換失敗 ({part}): {str(e)}", 500
+                return f"❌ MP3 轉換錯誤（{part}）：{e}", 500
 
-    # 清理臨時檔案
-    wav_path.unlink(missing_ok=True)
+    # 清理暫存檔
+    try:
+        wav_path.unlink(missing_ok=True)
+        Path("cookies.txt").unlink(missing_ok=True)
+    except Exception:
+        pass
 
     return redirect(url_for("mixer", title=title))
 
-# 其他路由（index, mixer, reset）保持不變
+@app.route("/mixer/<title>")
+def mixer(title):
+    history = []
+
+    # 歷史曲目紀錄（可擴充）
+    mp3_folder = static_dir / title
+    if mp3_folder.exists():
+        history.append({
+            "title": title,
+            "folder": title
+        })
+
+    return render_template("mixer_template.html", title=title, folder=title, history=history)
+
+@app.route("/reset")
+def reset():
+    return redirect(url_for("index"))
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204  # 避免 favicon 404
+
+if __name__ == "__main__":
+    app.run(debug=True)
