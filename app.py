@@ -8,13 +8,17 @@ import sys
 import threading
 import uuid
 import traceback
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "2025")
 
 downloads = Path("downloads")
 static_dir = Path("static")
 jobs = {}
+
+# 上傳音檔方案
+app.config['UPLOAD_FOLDER'] = 'uploads'
+Path(app.config['UPLOAD_FOLDER']).mkdir(exist_ok=True)
 
 downloads.mkdir(exist_ok=True)
 static_dir.mkdir(exist_ok=True)
@@ -52,7 +56,7 @@ def separate_background(task_id, youtube_url):
         wav_path = Path(info["requested_downloads"][0]["filepath"]).with_suffix(".wav")
         title = wav_path.stem
         jobs[task_id] = f"音源分離中：{title}"
-        print(f"[任務 {task_id}] 狀態：音源分離中：{title}")
+        print(f"[任務 {task_id}] 狀態：音源分離中，準備開啟播放器：{title}")
 
         sep_dir = Path("separated/htdemucs") / title
         if not sep_dir.exists():
@@ -83,6 +87,7 @@ def separate_background(task_id, youtube_url):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
+        # 處理 YouTube 連結
         url = request.form.get("youtube_url")
         cookies_file = request.files.get("cookies")
 
@@ -96,7 +101,16 @@ def index():
         thread = threading.Thread(target=separate_background, args=(task_id, url))
         thread.start()
         return redirect(url_for("status", task_id=task_id))
-
+      # 處理音檔上傳
+    if 'audio_file' in request.files:
+                audio_file = request.files['audio_file']
+                if audio_file.filename != "":
+                    filename = secure_filename(audio_file.filename)
+                    unique_name = f"{uuid.uuid4().hex}_{filename}"
+                    upload_path = Path(app.config['UPLOAD_FOLDER']) / unique_name
+                    audio_file.save(upload_path)
+           # 呼叫與 YouTube 相同的處理流程
+                    return redirect(url_for("separate_upload", filepath=str(upload_path)))
     return render_template("index.html")
 
 
