@@ -23,6 +23,7 @@ def index():
         url = request.form.get("youtube_url")
         if url:
             return redirect(url_for("separate", youtube_url=url))
+            return render_template("index.html")
     return """
         <h2>Demucs 音源分離器</h2>
         <form method="POST">
