@@ -10,4 +10,4 @@ numpy==1.26.4
 yt-dlp
 pydub==0.25.1
 gunicorn
-soundfile
+soundfile==0.13.1
