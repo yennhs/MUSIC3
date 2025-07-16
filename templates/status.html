@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>任務進行中</title>
+  <script>
+    async function checkStatus() {
+      const res = await fetch(`/status_api?task_id={{ task_id }}`);
+      const data = await res.json();
+
+      if (data.status === "done") {
+        window.location.href = `/mixer/${data.title}`;
+      } else if (data.status === "error") {
+        document.getElementById("status").innerText = "❌ 發生錯誤：" + data.message;
+      } else {
+        document.getElementById("status").innerText = "🔄 " + data.message;
+        setTimeout(checkStatus, 3000);
+      }
+    }
+
+    window.onload = checkStatus;
+  </script>
+</head>
+<body>
+  <h2>任務處理中，請稍候...</h2>
+  <p id="status">⏳ 正在初始化...</p>
+</body>
+</html>
