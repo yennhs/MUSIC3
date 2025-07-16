@@ -4,6 +4,7 @@ import subprocess
 import yt_dlp
 from pydub import AudioSegment
 import os
+import sys
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "2025")
@@ -86,7 +87,7 @@ def separate():
     try:
         if not sep_dir.exists():
             subprocess.run([
-                "python3", "-m", "demucs", "-n", "demucs_quantized", str(wav_path)
+                sys.executable, "-m", "demucs", "-n", "htdemucs", str(wav_path)
             ], check=True)
     except subprocess.CalledProcessError as e:
         return f"❌ 音源分離失敗：{e}", 500
