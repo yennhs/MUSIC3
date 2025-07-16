@@ -1,6 +1,7 @@
 *.mp3
 *.wav
 __pycache__/
+cookies.txt
 downloads/
 separated/
 static/*/*.mp3
